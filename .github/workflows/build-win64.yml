@@ -74,9 +74,6 @@ jobs:
             exit 1
           }
 
-          # splitter.h is handled separately below because this
-          # particular iNFekt source tree may only have a stale
-          # include for it.
           $splitter = Join-Path $win32xx "splitter.h"
 
           if (Test-Path $splitter) {
@@ -92,16 +89,7 @@ jobs:
           Write-Host "Win32++ base headers verified."
 
       # ============================================================
-      # Handle splitter.h
-      #
-      # If splitter.h is missing, determine whether the actual
-      # iNFekt source uses CSplitter.
-      #
-      # If only stdafx.h includes splitter.h and CSplitter is not
-      # actually used, remove that stale include in the runner
-      # workspace.
-      #
-      # The repository itself is NOT modified.
+      # Handle missing splitter.h
       # ============================================================
       - name: Handle missing splitter.h
         shell: pwsh
@@ -121,7 +109,6 @@ jobs:
             exit 1
           }
 
-          # Search for actual CSplitter references.
           $splitterUsage = Get-ChildItem `
             -Path $sourceRoot `
             -Recurse `
@@ -132,8 +119,6 @@ jobs:
               -CaseSensitive `
               -SimpleMatch:$false
 
-          # Remove matches that would only come from the expected
-          # Win32++ include line in stdafx.h.
           $actualUsage = @(
             $splitterUsage | Where-Object {
               -not (
@@ -146,20 +131,16 @@ jobs:
           if ($actualUsage.Count -gt 0) {
             Write-Host ""
             Write-Host "CSplitter usage was found:"
+
             $actualUsage | ForEach-Object {
               Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())"
             }
 
-            Write-Error ""
             Write-Error "splitter.h is required by the source code."
-            Write-Error "Do not remove the splitter.h include."
-            Write-Error "The correct Win32++ splitter.h must be added to the repository."
+            Write-Error "Add the correct Win32++ splitter.h to the repository."
             exit 1
           }
 
-          # We know the current source only references splitter.h
-          # through the precompiled header, so test whether the
-          # include exists there.
           $stdafx = Join-Path $PWD "src\win32\stdafx.h"
 
           if (-not (Test-Path $stdafx)) {
@@ -192,16 +173,23 @@ jobs:
           Write-Host ""
           Write-Host "========================================"
           Write-Host "Removed unused splitter.h include"
-          Write-Host "from the temporary CI workspace."
+          Write-Host "from temporary CI workspace."
           Write-Host "========================================"
-
-          Write-Host ""
-          Write-Host "Current stdafx.h Win32++ section:"
-          Get-Content $stdafx |
-            Select-Object -First 40
 
       # ============================================================
       # Install Boost 1.82.0
+      #
+      # IMPORTANT:
+      # The official archive extracts as:
+      #
+      #   boost_1_82_0\
+      #       boost\
+      #
+      # But iNFekt's VCXPROJ explicitly expects:
+      #
+      #   C:\Dev\boost
+      #
+      # Therefore rename the extracted root to C:\Dev\boost.
       # ============================================================
       - name: Install Boost 1.82.0
         shell: pwsh
@@ -246,6 +234,16 @@ jobs:
             -Force `
             -Path $installRoot | Out-Null
 
+          # Remove stale installation if present.
+          if (Test-Path $boostRoot) {
+            Write-Host "Removing existing C:\Dev\boost..."
+            Remove-Item `
+              -Path $boostRoot `
+              -Recurse `
+              -Force
+          }
+
+          Write-Host ""
           Write-Host "Extracting Boost..."
 
           Expand-Archive `
@@ -253,14 +251,69 @@ jobs:
             -DestinationPath $installRoot `
             -Force
 
-          if (-not (Test-Path "$boostRoot\boost")) {
-            Write-Error "Boost directory not found:"
-            Write-Error "$boostRoot\boost"
+          # Find the actual Boost root by locating boost\format.hpp.
+          $boostHeader = Get-ChildItem `
+            -Path $installRoot `
+            -Recurse `
+            -File `
+            -Filter "format.hpp" |
+            Where-Object {
+              $_.FullName -match '\\boost\\format\.hpp$'
+            } |
+            Select-Object -First 1
+
+          if (-not $boostHeader) {
+            Write-Error "Could not locate Boost root after extraction."
+
+            Write-Host ""
+            Write-Host "Directories under C:\Dev:"
+            Get-ChildItem `
+              -Path $installRoot `
+              -Directory `
+              -Force |
+              Select-Object FullName
+
             exit 1
           }
 
-          if (-not (Test-Path "$boostRoot\boost\format.hpp")) {
-            Write-Error "Boost format.hpp was not found."
+          # Example source:
+          # C:\Dev\boost_1_82_0\boost\format.hpp
+          #
+          # Therefore the Boost root is:
+          # C:\Dev\boost_1_82_0
+          $extractedBoostRoot = $boostHeader.Directory.Parent.FullName
+
+          Write-Host ""
+          Write-Host "Detected Boost root:"
+          Write-Host $extractedBoostRoot
+
+          Write-Host ""
+          Write-Host "Moving Boost root to:"
+          Write-Host $boostRoot
+
+          if (
+            (Split-Path $extractedBoostRoot -Parent).TrimEnd('\') `
+            -ne `
+            $installRoot.TrimEnd('\')
+          ) {
+            Write-Error "Unexpected Boost directory layout:"
+            Write-Error $extractedBoostRoot
+            exit 1
+          }
+
+          if ($extractedBoostRoot -ne $boostRoot) {
+            Rename-Item `
+              -Path $extractedBoostRoot `
+              -NewName "boost"
+          }
+
+          # Final verification.
+          $finalHeader = "$boostRoot\boost\format.hpp"
+
+          if (-not (Test-Path $finalHeader)) {
+            Write-Error "Boost installation failed."
+            Write-Error "Expected:"
+            Write-Error $finalHeader
             exit 1
           }
 
@@ -269,7 +322,13 @@ jobs:
           Write-Host "Boost 1.82.0 installed successfully"
           Write-Host "========================================"
 
-          Get-Item "$boostRoot\boost\format.hpp" |
+          Write-Host ""
+          Write-Host "Boost root:"
+          Write-Host $boostRoot
+
+          Write-Host ""
+          Write-Host "Verified header:"
+          Get-Item $finalHeader |
             Format-List FullName,Length
 
       # ============================================================
@@ -333,7 +392,7 @@ jobs:
           msbuild-architecture: x64
 
       # ============================================================
-      # Build
+      # Build Release-Static | x64
       # ============================================================
       - name: Build iNFekt
         shell: pwsh
@@ -416,6 +475,7 @@ jobs:
           Write-Host ""
           Write-Host "Packaging:"
           Write-Host $src
+
           Write-Host ""
           Write-Host "Output:"
           Write-Host $zip
