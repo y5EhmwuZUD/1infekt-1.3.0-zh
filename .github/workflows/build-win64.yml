@@ -12,19 +12,13 @@ jobs:
 
     steps:
       # ============================================================
-      # Checkout source
+      # Checkout
       # ============================================================
       - name: Checkout iNFekt
         uses: actions/checkout@v5
 
       # ============================================================
       # Verify Win32++
-      #
-      # Win32++ 7.0.2 is stored directly in the repository:
-      #
-      # dependencies/include/win32xx/
-      #
-      # This avoids SourceForge entirely during Actions builds.
       # ============================================================
       - name: Verify Win32++
         shell: pwsh
@@ -51,7 +45,6 @@ jobs:
             "propertysheet.h",
             "rebar.h",
             "socket.h",
-            "splitter.h",
             "statusbar.h",
             "toolbar.h",
             "treeview.h"
@@ -60,7 +53,7 @@ jobs:
           $missing = @()
 
           Write-Host ""
-          Write-Host "Required headers:"
+          Write-Host "Checking required Win32++ headers..."
 
           foreach ($header in $requiredHeaders) {
             $path = Join-Path $win32xx $header
@@ -76,25 +69,139 @@ jobs:
           }
 
           if ($missing.Count -gt 0) {
-            Write-Error "Missing Win32++ headers:"
+            Write-Error "Required Win32++ headers are missing:"
             Write-Error ($missing -join ", ")
             exit 1
           }
 
+          # splitter.h is handled separately below because this
+          # particular iNFekt source tree may only have a stale
+          # include for it.
+          $splitter = Join-Path $win32xx "splitter.h"
+
+          if (Test-Path $splitter) {
+            Write-Host "OK    splitter.h"
+            "SPLITTER_PRESENT=true" >> $env:GITHUB_ENV
+          }
+          else {
+            Write-Host "INFO  splitter.h is not present"
+            "SPLITTER_PRESENT=false" >> $env:GITHUB_ENV
+          }
+
+          Write-Host ""
+          Write-Host "Win32++ base headers verified."
+
+      # ============================================================
+      # Handle splitter.h
+      #
+      # If splitter.h is missing, determine whether the actual
+      # iNFekt source uses CSplitter.
+      #
+      # If only stdafx.h includes splitter.h and CSplitter is not
+      # actually used, remove that stale include in the runner
+      # workspace.
+      #
+      # The repository itself is NOT modified.
+      # ============================================================
+      - name: Handle missing splitter.h
+        shell: pwsh
+        run: |
+          if ($env:SPLITTER_PRESENT -eq "true") {
+            Write-Host "splitter.h exists. No patch required."
+            exit 0
+          }
+
+          Write-Host "splitter.h is missing."
+          Write-Host "Checking whether iNFekt actually uses CSplitter..."
+
+          $sourceRoot = Join-Path $PWD "src"
+
+          if (-not (Test-Path $sourceRoot)) {
+            Write-Error "Source directory not found: $sourceRoot"
+            exit 1
+          }
+
+          # Search for actual CSplitter references.
+          $splitterUsage = Get-ChildItem `
+            -Path $sourceRoot `
+            -Recurse `
+            -File `
+            -Include *.h,*.hpp,*.c,*.cc,*.cpp |
+            Select-String `
+              -Pattern '\bCSplitter\b' `
+              -CaseSensitive `
+              -SimpleMatch:$false
+
+          # Remove matches that would only come from the expected
+          # Win32++ include line in stdafx.h.
+          $actualUsage = @(
+            $splitterUsage | Where-Object {
+              -not (
+                $_.Path.EndsWith("stdafx.h") -and
+                $_.Line -match '#include\s*[<"]splitter\.h[>"]'
+              )
+            }
+          )
+
+          if ($actualUsage.Count -gt 0) {
+            Write-Host ""
+            Write-Host "CSplitter usage was found:"
+            $actualUsage | ForEach-Object {
+              Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())"
+            }
+
+            Write-Error ""
+            Write-Error "splitter.h is required by the source code."
+            Write-Error "Do not remove the splitter.h include."
+            Write-Error "The correct Win32++ splitter.h must be added to the repository."
+            exit 1
+          }
+
+          # We know the current source only references splitter.h
+          # through the precompiled header, so test whether the
+          # include exists there.
+          $stdafx = Join-Path $PWD "src\win32\stdafx.h"
+
+          if (-not (Test-Path $stdafx)) {
+            Write-Error "stdafx.h not found: $stdafx"
+            exit 1
+          }
+
+          $content = Get-Content `
+            -Path $stdafx `
+            -Raw
+
+          $pattern = '(?m)^\s*#include\s*[<"]splitter\.h[>"]\s*\r?\n?'
+
+          if ($content -notmatch $pattern) {
+            Write-Error "stdafx.h does not contain the expected splitter.h include."
+            exit 1
+          }
+
+          $patched = [regex]::Replace(
+            $content,
+            $pattern,
+            "// splitter.h is not included because this source tree does not use CSplitter.`r`n"
+          )
+
+          Set-Content `
+            -Path $stdafx `
+            -Value $patched `
+            -Encoding utf8
+
           Write-Host ""
           Write-Host "========================================"
-          Write-Host "Win32++ verification successful"
+          Write-Host "Removed unused splitter.h include"
+          Write-Host "from the temporary CI workspace."
           Write-Host "========================================"
+
+          Write-Host ""
+          Write-Host "Current stdafx.h Win32++ section:"
+          Get-Content $stdafx |
+            Select-Object -First 40
 
       # ============================================================
       # Install Boost 1.82.0
-      #
-      # iNFekt 1.3.0 uses Boost 1.82.
-      #
-      # The existing VCXPROJ contains:
-      #     C:\Dev\boost
-      #
-      # Therefore keep that exact location.
       # ============================================================
       - name: Install Boost 1.82.0
         shell: pwsh
@@ -116,12 +223,12 @@ jobs:
             $url
 
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Boost download failed"
+            Write-Error "Boost download failed."
             exit 1
           }
 
           if (-not (Test-Path $zip)) {
-            Write-Error "Boost archive does not exist"
+            Write-Error "Boost archive was not downloaded."
             exit 1
           }
 
@@ -130,7 +237,7 @@ jobs:
           Write-Host "Boost archive size: $size bytes"
 
           if ($size -lt 1000000) {
-            Write-Error "Boost archive is unexpectedly small"
+            Write-Error "Boost archive is unexpectedly small."
             exit 1
           }
 
@@ -147,33 +254,32 @@ jobs:
             -Force
 
           if (-not (Test-Path "$boostRoot\boost")) {
-            Write-Error "Boost installation failed"
+            Write-Error "Boost directory not found:"
+            Write-Error "$boostRoot\boost"
             exit 1
           }
 
           if (-not (Test-Path "$boostRoot\boost\format.hpp")) {
-            Write-Error "Boost format.hpp not found"
+            Write-Error "Boost format.hpp was not found."
             exit 1
           }
 
           Write-Host ""
           Write-Host "========================================"
-          Write-Host "Boost installed successfully"
+          Write-Host "Boost 1.82.0 installed successfully"
           Write-Host "========================================"
 
           Get-Item "$boostRoot\boost\format.hpp" |
             Format-List FullName,Length
 
       # ============================================================
-      # Verify iNFekt's bundled static libraries
+      # Verify bundled iNFekt libraries
       # ============================================================
       - name: Verify iNFekt dependencies
         shell: pwsh
         run: |
           $includeDir = "dependencies\include"
           $libDir = "dependencies\lib_x64_static"
-
-          Write-Host "Checking dependency directories..."
 
           if (-not (Test-Path $includeDir)) {
             Write-Error "Missing directory: $includeDir"
@@ -216,7 +322,7 @@ jobs:
           }
 
           Write-Host ""
-          Write-Host "iNFekt dependency verification successful."
+          Write-Host "All bundled libraries are present."
 
       # ============================================================
       # Setup MSBuild
@@ -228,8 +334,6 @@ jobs:
 
       # ============================================================
       # Build
-      #
-      # Release-Static + x64 is the desired portable build.
       # ============================================================
       - name: Build iNFekt
         shell: pwsh
@@ -251,7 +355,7 @@ jobs:
             /verbosity:minimal
 
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "MSBuild failed"
+            Write-Error "MSBuild failed."
             exit 1
           }
 
@@ -271,7 +375,7 @@ jobs:
             Write-Error "infekt-win64.exe was not produced."
 
             Write-Host ""
-            Write-Host "Build directory contents:"
+            Write-Host "Build output tree:"
 
             $outputDir = "project\build-out"
 
@@ -322,7 +426,7 @@ jobs:
             -Force
 
           if (-not (Test-Path $zip)) {
-            Write-Error "Failed to create ZIP"
+            Write-Error "Failed to create portable ZIP."
             exit 1
           }
 
@@ -335,7 +439,7 @@ jobs:
             Format-List FullName,Length
 
       # ============================================================
-      # Upload GitHub Actions Artifact
+      # Upload artifact
       # ============================================================
       - name: Upload portable build
         uses: actions/upload-artifact@v4
