@@ -1,0 +1,14 @@
+Release
+Release-Compact
+Release-Static
+Debug
+Release-x64
+Release-Static-x64
+Debug-x64
+temp
+iNFekt-SuperCompact
+iNFekt-32bit-Portable
+iNFekt-64bit-Portable
+*.rar
+iNFektPortable
+*.exe

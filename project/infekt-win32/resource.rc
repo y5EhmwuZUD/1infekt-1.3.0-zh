@@ -1,0 +1,462 @@
+﻿// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "WinResrc.h"
+#define IDC_STATIC -1
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// German (Germany) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_DEU)
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+#pragma code_page(65001)
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""WinResrc.h""\r\n"
+    "#define IDC_STATIC -1\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+#endif    // German (Germany) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(65001)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_DLG_SETTINGS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 348
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 250
+    END
+
+    IDD_TAB_GENERAL, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 330
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 200
+    END
+
+    IDD_TAB_VIEWSETTINGS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 330
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 200
+    END
+
+    IDD_ABOUT, DIALOG
+    BEGIN
+        BOTTOMMARGIN, 119
+    END
+
+    IDD_TAB_PLUGINS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 330
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 200
+    END
+
+    IDD_DLG_ADVANCED_SETTINGS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 310
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 163
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MAIN_MENU MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "打开...\tCtrl+O",             IDM_FILE_OPEN
+        MENUITEM SEPARATOR
+        POPUP "导出"
+        BEGIN
+            MENUITEM "导出为 PNG...\tCtrl+P",           IDM_EXPORT_PNG
+            MENUITEM "导出为 PNG（透明）...",     IDM_EXPORT_PNG_TRANSP
+            MENUITEM SEPARATOR
+            MENUITEM "导出为 UTF-8 文本文件...\tCtrl+S", IDM_EXPORT_UTF8
+            MENUITEM "导出为 UTF-16 文本文件...",      IDM_EXPORT_UTF16
+            MENUITEM "导出为 CP437 NFO 文件...",       IDM_EXPORT_CP437
+            MENUITEM SEPARATOR
+            MENUITEM "导出为 HTML...",                  IDM_EXPORT_XHTML
+            MENUITEM "导出为 HTML（Canvas）...",         IDM_EXPORT_XHTML_CANVAS
+            MENUITEM SEPARATOR
+            MENUITEM "导出为 PDF...",                   IDM_EXPORT_PDF
+            MENUITEM "导出为 PDF（DIN 尺寸）...",        IDM_EXPORT_PDF_DIN
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "退出\tAlt+F4",                IDM_EXIT
+    END
+    POPUP "视图(&V)"
+    BEGIN
+        MENUITEM "渲染视图\tF2",                IDM_VIEW_RENDERED
+        MENUITEM "经典视图\tF3",                 IDM_VIEW_CLASSIC
+        MENUITEM "纯文本视图\tF4",               IDM_VIEW_TEXTONLY
+        MENUITEM SEPARATOR
+        MENUITEM "重新加载\tF5",                  IDM_VIEW_RELOAD
+        MENUITEM "最佳宽度",               IDM_OPTIWIDTH
+        MENUITEM SEPARATOR
+        POPUP "缩放"
+        BEGIN
+            MENUITEM "放大\tCtrl++",             IDM_ZOOM_IN
+            MENUITEM "缩小\tCtrl+-",            IDM_ZOOM_OUT
+            MENUITEM SEPARATOR
+            MENUITEM "重置\tCtrl+0",               IDM_ZOOM_RESET
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "始终置顶\tCtrl+T",       IDM_ALWAYSONTOP
+        MENUITEM "显示状态栏",             IDM_SHOWSTATUSBAR
+        MENUITEM "显示工具栏",                IDM_VIEW_SHOWTOOLBAR
+    END
+    POPUP "工具(&T)"
+    BEGIN
+        MENUITEM "设置\tF6",                IDM_SETTINGS
+        MENUITEM SEPARATOR
+        MENUITEM "下一个 NFO\tJ",                 IDM_TOOLS_NEXTNFO
+        MENUITEM "上一个 NFO\tK",             IDM_TOOLS_PREVIOUSNFO
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "检查更新...",        IDM_CHECKFORUPDATES
+        MENUITEM SEPARATOR
+        MENUITEM "关于...\tF1",                IDM_ABOUT
+    END
+END
+
+IDR_CONTEXT_MENU MENU
+BEGIN
+    POPUP "."
+    BEGIN
+        MENUITEM "复制\tCtrl+C",                IDMC_COPY
+        MENUITEM "全选\tCtrl+A",          IDMC_SELECTALL
+        MENUITEM SEPARATOR
+        MENUITEM "复制快捷方式",               IDMC_COPYSHORTCUT
+        MENUITEM SEPARATOR
+        MENUITEM "始终置顶\tCtrl+T",       IDMC_ALWAYSONTOP
+        MENUITEM "切换工具栏\tCtrl+G",      IDMC_TOGGLE_TOOLBAR
+        MENUITEM SEPARATOR
+        MENUITEM "重新加载\tF5",                  IDMC_RELOAD
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// PNG
+//
+
+IDB_PNG_FILEOPEN        PNG                     "icons\\folder_txt.png"
+
+IDB_PNG_INFO            PNG                     "icons\\info.png"
+
+IDB_PNG_SETTINGS        PNG                     "icons\\advancedsettings.png"
+
+IDB_PNG_VIEW_CLASSIC    PNG                     "icons\\mime_colorset.png"
+
+IDB_PNG_VIEW_TEXTONLY   PNG                     "icons\\template_source.png"
+
+IDB_PNG_VIEW_RENDERED   PNG                     "icons\\kllckety_doc.png"
+
+IDB_PNG_SHOWMENU        PNG                     "icons\\view_top_bottom.png"
+
+IDB_PNG_FIND16          PNG                     "icons\\find.png"
+
+IDB_PNG_CLOSE16         PNG                     "icons\\fileclose.png"
+
+IDB_PNG_DOWN16          PNG                     "icons\\1downarrow.png"
+
+IDB_PNG_UP16            PNG                     "icons\\1uparrow.png"
+
+IDB_PNG_WARNING16       PNG                     "icons\\messagebox_warning.png"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DLG_SETTINGS DIALOGEX 0, 0, 355, 257
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iNFekt - 设置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,245,236,50,14
+    PUSHBUTTON      "取消",IDCANCEL,298,236,50,14
+    CONTROL         "",IDC_SETTINGS_TAB,"SysTabControl32",TCS_MULTILINE | TCS_FIXEDWIDTH | WS_TABSTOP,7,7,341,224
+END
+
+IDD_TAB_GENERAL DIALOGEX 0, 0, 337, 207
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x0
+BEGIN
+    GROUPBOX        "启动",IDC_STATIC,7,7,323,66
+    CONTROL         "启动时始终检查 iNFekt 是否为默认 NFO 查看器",IDC_CHECK_DEFAULT_VIEWER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,22,207,10
+    PUSHBUTTON      "立即检查",IDC_BUTTON_DEFAULT_VIEWER,259,19,62,14
+    CONTROL         "始终置顶",IDC_ALWAYSONTOP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,87,61,10
+    GROUPBOX        "主题/视图设置导出与导入",IDC_STATIC,7,124,323,36
+    PUSHBUTTON      "导出...",IDC_THEME_EXPORT,16,139,62,14
+    PUSHBUTTON      "导入...",IDC_THEME_IMPORT,85,139,62,14
+    LTEXT           "状态",IDC_SETTINGS_BACKEND_STATUS,10,190,209,8
+    CONTROL         "记住最近打开的文件",IDC_REMEMBERMRU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,122,87,86,10
+    PUSHBUTTON      "高级...",IDC_BUTTON_ADVANCED,261,100,62,14
+    CONTROL         "自动换行",IDC_LINEWRAP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,122,102,86,10
+    CONTROL         "按 Esc 键退出程序",IDC_CLOSE_ON_ESC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,102,99,10
+    CONTROL         "启动时显示菜单栏",IDC_MENUBAR_ON_STARTUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,41,99,10
+    LTEXT           "默认视图：",IDC_STATIC,215,42,44,9
+    COMBOBOX        IDC_COMBO_DEFAULTVIEW,263,40,58,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "复用查看器窗口（单实例模式）",IDC_SINGLEINSTANCEMODE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,56,161,10
+    GROUPBOX        "",IDC_STATIC,7,76,323,44
+END
+
+IDD_TAB_VIEWSETTINGS DIALOGEX 0, 0, 337, 207
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x0
+BEGIN
+    GROUPBOX        "选项",IDC_STATIC,7,7,323,51
+    CONTROL         "启用发光效果",IDC_ACTIVATE_GLOW,"Button",BS_AUTOCHECKBOX | BS_NOTIFY | WS_TABSTOP,112,22,81,10
+    GROUPBOX        "颜色",IDC_STATIC,7,60,323,76
+    LTEXT           "背景：",IDC_STATIC,15,99,41,8
+    LTEXT           "块图：",IDC_LABEL_ART,125,99,32,8
+    LTEXT           "发光效果：",IDC_GLOW_LABEL1,229,76,40,8
+    LTEXT           "普通文本：",IDC_STATIC,15,76,42,8
+    CONTROL         "",IDC_CLR_TEXT,"Button",BS_OWNERDRAW | WS_TABSTOP,62,74,50,14,WS_EX_STATICEDGE
+    CONTROL         "高亮超链接",IDC_HILIGHT_LINKS,"Button",BS_AUTOCHECKBOX | BS_NOTIFY | WS_TABSTOP,15,22,78,10
+    CONTROL         "超链接加下划线",IDC_UNDERL_LINKS,"Button",BS_AUTOCHECKBOX | BS_NOTIFY | WS_TABSTOP,15,39,81,10
+    LTEXT           "发光半径：",IDC_GLOW_LABEL2,112,40,42,8
+    CONTROL         "",IDC_GLOW_RADIUS,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,156,37,100,15
+    PUSHBUTTON      "预览",IDC_PREVIEW_BTN,277,119,50,14
+    CONTROL         "",IDC_CLR_BACK,"Button",BS_OWNERDRAW | WS_TABSTOP,62,97,50,14,WS_EX_STATICEDGE
+    CONTROL         "",IDC_CLR_GAUSS,"Button",BS_OWNERDRAW | WS_TABSTOP,271,74,50,14,WS_EX_STATICEDGE
+    CONTROL         "从渲染视图同步设置",IDC_SYNC_FROM_RENDERED,
+                    "Button",BS_AUTOCHECKBOX | BS_NOTIFY | NOT WS_VISIBLE | WS_DISABLED | WS_TABSTOP,8,193,149,10
+    CONTROL         "从经典视图同步设置",IDC_SYNC_FROM_NORMAL,
+                    "Button",BS_AUTOCHECKBOX | BS_NOTIFY | NOT WS_VISIBLE | WS_DISABLED | WS_TABSTOP,191,193,139,10
+    LTEXT           "Windows 颜色选择器不支持 Alpha 通道设置；在我们实现自有选择器前，需要编辑注册表进行修改。",IDC_STATIC,15,117,244,16
+    LTEXT           "超链接：",IDC_STATIC,126,76,36,8
+    CONTROL         "",IDC_CLR_LINKS,"Button",BS_OWNERDRAW | WS_TABSTOP,165,74,50,14,WS_EX_STATICEDGE
+    CONTROL         "",IDC_CLR_ART,"Button",BS_OWNERDRAW | WS_TABSTOP,165,98,50,14,WS_EX_STATICEDGE
+    LTEXT           "100",IDC_GLOW_RADIUS_LABEL,255,40,22,9
+    GROUPBOX        "字体",IDC_STATIC,7,139,323,49
+    CONTROL         "启用抗锯齿",IDC_FONT_ANTIALIAS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,245,153,77,10
+    LTEXT           "字体：",IDC_STATIC,14,153,40,8
+    COMBOBOX        IDC_FONTNAME_COMBO,56,149,105,30,CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_FONT_SIZE_EDIT2,104,170,39,14,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_FONT_SIZE_EDIT,56,170,39,14,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "字号：",IDC_FONTSIZE_LABEL,14,173,33,8
+    LTEXT           "（宽度 × 高度）",IDC_BLOCKSIZE_LABEL2,148,173,55,8
+    LTEXT           "块大小：",IDC_BLOCKSIZE_LABEL,14,172,34,8
+    CONTROL         "",IDC_FONT_SIZE_SPIN,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS,84,168,9,13
+    CONTROL         "",IDC_FONT_SIZE_SPIN2,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS,134,168,9,13
+    COMBOBOX        IDC_FONTSIZE_COMBO,56,170,49,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "ANSI 艺术发光效果",IDC_GLOW_ANSI,"Button",BS_AUTOCHECKBOX | BS_NOTIFY | WS_TABSTOP,213,22,94,10
+    CONTROL         "粗体",IDC_FONT_BOLD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,168,153,35,10
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 232, 125
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "关于"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,170,105,55,14
+END
+
+IDD_TAB_PLUGINS DIALOGEX 0, 0, 337, 207
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PLUGIN_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOLABELWRAP | LVS_AUTOARRANGE | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,323,112
+END
+
+IDD_DLG_ADVANCED_SETTINGS DIALOGEX 0, 0, 317, 170
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "高级设置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,205,149,50,14
+    PUSHBUTTON      "取消",IDCANCEL,260,149,50,14
+    GROUPBOX        "窗口选项",IDC_STATIC,7,7,303,49
+    CONTROL         "启动时自动居中窗口",IDC_CENTER_WINDOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,22,122,10
+    CONTROL         "使用居中的 NFO 视图",IDC_CENTER_NFO,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,38,121,10
+    CONTROL         "根据 NFO 宽度自动调整窗口宽度",IDC_AUTO_WIDTH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,22,148,10
+    GROUPBOX        "其他",IDC_STATIC,7,59,303,47
+    CONTROL         "导出时默认使用 NFO 所在目录",IDC_EXPORT_NFO_DIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,89,148,10
+    GROUPBOX        "内部选项",IDC_STATIC,7,110,303,32
+    CONTROL         "大文件使用按需渲染",IDC_ONDEMAND_RENDERING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,124,148,10
+    CONTROL         "文件变化时自动刷新",IDC_MONITOR_FILE_CHANGES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,173,74,116,10
+    CONTROL         "启用硬件（GPU）加速",IDC_USE_GPU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,173,124,127,10
+    CONTROL         "选中时复制",IDC_COPY_ON_SELECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,73,64,10
+    CONTROL         "自动调整窗口高度",IDC_AUTO_HEIGHT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,39,148,10
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_MAIN_KEYBOARD_SHORTCUTS ACCELERATORS
+BEGIN
+    "T",            IDM_ALWAYSONTOP,        VIRTKEY, CONTROL, NOINVERT
+    "P",            IDM_EXPORT_PNG,         VIRTKEY, CONTROL, NOINVERT
+    "S",            IDM_EXPORT_UTF8,        VIRTKEY, CONTROL, NOINVERT
+    "O",            IDM_FILE_OPEN,          VIRTKEY, CONTROL, NOINVERT
+    "F",            IDM_FINDTEXT,           VIRTKEY, CONTROL, NOINVERT
+    VK_F12,         IDM_HIDDENGIMMICK,      VIRTKEY, NOINVERT
+    VK_F6,          IDM_SETTINGS,           VIRTKEY, NOINVERT
+    "J",            IDM_TOOLS_NEXTNFO,      VIRTKEY, NOINVERT
+    "K",            IDM_TOOLS_PREVIOUSNFO,  VIRTKEY, NOINVERT
+    VK_F3,          IDM_VIEW_CLASSIC,       VIRTKEY, NOINVERT
+    "R",            IDM_VIEW_RELOAD,        VIRTKEY, CONTROL, NOINVERT
+    VK_F5,          IDM_VIEW_RELOAD,        VIRTKEY, NOINVERT
+    VK_F2,          IDM_VIEW_RENDERED,      VIRTKEY, NOINVERT
+    "G",            IDM_VIEW_SHOWTOOLBAR,   VIRTKEY, CONTROL, NOINVERT
+    VK_F4,          IDM_VIEW_TEXTONLY,      VIRTKEY, NOINVERT
+    VK_ADD,         IDM_ZOOM_IN,            VIRTKEY, CONTROL, NOINVERT
+    VK_OEM_PLUS,    IDM_ZOOM_IN,            VIRTKEY, CONTROL, NOINVERT
+    VK_OEM_MINUS,   IDM_ZOOM_OUT,           VIRTKEY, CONTROL, NOINVERT
+    VK_SUBTRACT,    IDM_ZOOM_OUT,           VIRTKEY, CONTROL, NOINVERT
+    "0",            IDM_ZOOM_RESET,         VIRTKEY, CONTROL, NOINVERT
+    VK_NUMPAD0,     IDM_ZOOM_RESET,         VIRTKEY, CONTROL, NOINVERT
+    "C",            IDMC_COPY,              VIRTKEY, CONTROL, NOINVERT
+    "A",            IDMC_SELECTALL,         VIRTKEY, CONTROL, NOINVERT
+    VK_SPACE,       ID_SCROLL_PAGEDOWN,     VIRTKEY, NOINVERT
+    VK_SPACE,       ID_SCROLL_PAGEUP,       VIRTKEY, SHIFT, NOINVERT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_APPICON             ICON                    "iNFEKT_icon_by_railgun.ico"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,3,0,0
+ PRODUCTVERSION 1,3,0,0
+ FILEFLAGSMASK 0x17L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "https://infekt.ws - This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation."
+            VALUE "CompanyName", "syndicode"
+            VALUE "FileDescription", "iNFekt NFO Viewer"
+            VALUE "FileVersion", "1.3.0.0"
+            VALUE "InternalName", "iNFekt"
+            VALUE "LegalCopyright", "Copyright © 2010-2022 syndicode"
+            VALUE "OriginalFilename", "infekt-winXX.exe"
+            VALUE "ProductName", "iNFekt"
+            VALUE "ProductVersion", "1.3.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_TAB_VIEWSETTINGS AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

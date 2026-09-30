@@ -1,0 +1,5 @@
+"Developer Command Prompt for VS 2022"
+
+bootstrap
+.\b2 --with-program_options link=static address-model=32 runtime-link=static,shared
+.\b2 --with-program_options link=static address-model=64 runtime-link=static,shared
