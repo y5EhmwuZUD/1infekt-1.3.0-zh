@@ -1,0 +1,345 @@
+name: Build iNFekt Win64 Portable
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      # ============================================================
+      # Checkout source
+      # ============================================================
+      - name: Checkout iNFekt
+        uses: actions/checkout@v5
+
+      # ============================================================
+      # Verify Win32++
+      #
+      # Win32++ 7.0.2 is stored directly in the repository:
+      #
+      # dependencies/include/win32xx/
+      #
+      # This avoids SourceForge entirely during Actions builds.
+      # ============================================================
+      - name: Verify Win32++
+        shell: pwsh
+        run: |
+          $win32xx = "dependencies\include\win32xx"
+
+          Write-Host "Checking Win32++..."
+          Write-Host "Directory: $win32xx"
+
+          if (-not (Test-Path $win32xx)) {
+            Write-Error "Win32++ directory does not exist:"
+            Write-Error $win32xx
+            exit 1
+          }
+
+          $requiredHeaders = @(
+            "wincore.h",
+            "dialog.h",
+            "docking.h",
+            "frame.h",
+            "gdi.h",
+            "listview.h",
+            "mdi.h",
+            "propertysheet.h",
+            "rebar.h",
+            "socket.h",
+            "splitter.h",
+            "statusbar.h",
+            "toolbar.h",
+            "treeview.h"
+          )
+
+          $missing = @()
+
+          Write-Host ""
+          Write-Host "Required headers:"
+
+          foreach ($header in $requiredHeaders) {
+            $path = Join-Path $win32xx $header
+
+            if (Test-Path $path) {
+              $size = (Get-Item $path).Length
+              Write-Host "OK    $header ($size bytes)"
+            }
+            else {
+              Write-Host "MISS  $header"
+              $missing += $header
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing Win32++ headers:"
+            Write-Error ($missing -join ", ")
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Win32++ verification successful"
+          Write-Host "========================================"
+
+      # ============================================================
+      # Install Boost 1.82.0
+      #
+      # iNFekt 1.3.0 uses Boost 1.82.
+      #
+      # The existing VCXPROJ contains:
+      #     C:\Dev\boost
+      #
+      # Therefore keep that exact location.
+      # ============================================================
+      - name: Install Boost 1.82.0
+        shell: pwsh
+        run: |
+          $url = "https://archives.boost.io/release/1.82.0/source/boost_1_82_0.zip"
+          $zip = "$env:RUNNER_TEMP\boost_1_82_0.zip"
+          $installRoot = "C:\Dev"
+          $boostRoot = "C:\Dev\boost"
+
+          Write-Host "Downloading Boost 1.82.0..."
+
+          curl.exe `
+            -L `
+            --fail `
+            --retry 5 `
+            --retry-delay 3 `
+            -A "Mozilla/5.0" `
+            -o $zip `
+            $url
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Boost download failed"
+            exit 1
+          }
+
+          if (-not (Test-Path $zip)) {
+            Write-Error "Boost archive does not exist"
+            exit 1
+          }
+
+          $size = (Get-Item $zip).Length
+
+          Write-Host "Boost archive size: $size bytes"
+
+          if ($size -lt 1000000) {
+            Write-Error "Boost archive is unexpectedly small"
+            exit 1
+          }
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $installRoot | Out-Null
+
+          Write-Host "Extracting Boost..."
+
+          Expand-Archive `
+            -Path $zip `
+            -DestinationPath $installRoot `
+            -Force
+
+          if (-not (Test-Path "$boostRoot\boost")) {
+            Write-Error "Boost installation failed"
+            exit 1
+          }
+
+          if (-not (Test-Path "$boostRoot\boost\format.hpp")) {
+            Write-Error "Boost format.hpp not found"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Boost installed successfully"
+          Write-Host "========================================"
+
+          Get-Item "$boostRoot\boost\format.hpp" |
+            Format-List FullName,Length
+
+      # ============================================================
+      # Verify iNFekt's bundled static libraries
+      # ============================================================
+      - name: Verify iNFekt dependencies
+        shell: pwsh
+        run: |
+          $includeDir = "dependencies\include"
+          $libDir = "dependencies\lib_x64_static"
+
+          Write-Host "Checking dependency directories..."
+
+          if (-not (Test-Path $includeDir)) {
+            Write-Error "Missing directory: $includeDir"
+            exit 1
+          }
+
+          if (-not (Test-Path $libDir)) {
+            Write-Error "Missing directory: $libDir"
+            exit 1
+          }
+
+          $requiredLibs = @(
+            "cairo-static.lib",
+            "libpng16.lib",
+            "zlib.lib"
+          )
+
+          $missing = @()
+
+          Write-Host ""
+          Write-Host "Checking static libraries..."
+
+          foreach ($lib in $requiredLibs) {
+            $path = Join-Path $libDir $lib
+
+            if (Test-Path $path) {
+              $size = (Get-Item $path).Length
+              Write-Host "OK    $lib ($size bytes)"
+            }
+            else {
+              Write-Host "MISS  $lib"
+              $missing += $lib
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing static libraries:"
+            Write-Error ($missing -join ", ")
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "iNFekt dependency verification successful."
+
+      # ============================================================
+      # Setup MSBuild
+      # ============================================================
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+
+      # ============================================================
+      # Build
+      #
+      # Release-Static + x64 is the desired portable build.
+      # ============================================================
+      - name: Build iNFekt
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Building iNFekt"
+          Write-Host "Configuration : Release-Static"
+          Write-Host "Platform      : x64"
+          Write-Host "Toolset       : v143"
+          Write-Host "========================================"
+
+          msbuild `
+            project/infekt-win32/iNFekt.vcxproj `
+            /m `
+            /p:Configuration=Release-Static `
+            /p:Platform=x64 `
+            /p:PlatformToolset=v143 `
+            /verbosity:minimal
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "MSBuild failed"
+            exit 1
+          }
+
+      # ============================================================
+      # Verify executable
+      # ============================================================
+      - name: Verify build
+        shell: pwsh
+        run: |
+          $exe = "project\build-out\Release-Static-x64\infekt-win64.exe"
+
+          Write-Host ""
+          Write-Host "Checking executable:"
+          Write-Host $exe
+
+          if (-not (Test-Path $exe)) {
+            Write-Error "infekt-win64.exe was not produced."
+
+            Write-Host ""
+            Write-Host "Build directory contents:"
+
+            $outputDir = "project\build-out"
+
+            if (Test-Path $outputDir) {
+              Get-ChildItem `
+                -Path $outputDir `
+                -Recurse `
+                -File |
+                Select-Object FullName,Length
+            }
+
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "BUILD SUCCESSFUL"
+          Write-Host "========================================"
+
+          Get-Item $exe |
+            Format-List FullName,Length
+
+      # ============================================================
+      # Package portable ZIP
+      # ============================================================
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $src = "project\build-out\Release-Static-x64"
+          $zip = "iNFekt-win64-portable.zip"
+
+          if (-not (Test-Path "$src\infekt-win64.exe")) {
+            Write-Error "Executable not found:"
+            Write-Error "$src\infekt-win64.exe"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Packaging:"
+          Write-Host $src
+          Write-Host ""
+          Write-Host "Output:"
+          Write-Host $zip
+
+          Compress-Archive `
+            -Path "$src\*" `
+            -DestinationPath $zip `
+            -Force
+
+          if (-not (Test-Path $zip)) {
+            Write-Error "Failed to create ZIP"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "PORTABLE PACKAGE CREATED"
+          Write-Host "========================================"
+
+          Get-Item $zip |
+            Format-List FullName,Length
+
+      # ============================================================
+      # Upload GitHub Actions Artifact
+      # ============================================================
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: iNFekt-win64-portable
+          path: iNFekt-win64-portable.zip
+          if-no-files-found: error
