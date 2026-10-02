@@ -17,30 +17,36 @@ jobs:
 
 
       # ==========================================================
-      # 2. Obtain Win32++ 7.5.1
+      # 2. Install Win32++ 7.6.1
       #
-      # The current repository contains Win32++ 7.0.2-era headers.
-      # That version produces a Unicode/MSVC C2440 in frame.h.
+      # Official SourceForge file:
+      #   Win32xx761.zip
       #
-      # Try GitHub mirrors first, then SourceForge.
-      # Everything is CI-local and does NOT modify the repository.
+      # Do NOT use GitHub tags here.
+      # The DavidNash2024 GitHub repository does not expose
+      # the old 7.x tags used by this legacy project.
       # ==========================================================
-      - name: Install Win32++ 7.5.1
+      - name: Install Win32++ 7.6.1
         shell: pwsh
         run: |
           $target = Join-Path $PWD "dependencies\include\win32xx"
-          $tmpRoot = Join-Path $env:RUNNER_TEMP "win32xx-751"
-          $zip = Join-Path $env:RUNNER_TEMP "win32xx-751.zip"
+          $tmpRoot = Join-Path $env:RUNNER_TEMP "win32xx-761"
+          $zip = Join-Path $env:RUNNER_TEMP "Win32xx761.zip"
 
-          Write-Host "Preparing Win32++ 7.5.1..."
+          Write-Host "Preparing Win32++ 7.6.1..."
           Write-Host "Target: $target"
 
           if (Test-Path $tmpRoot) {
-            Remove-Item $tmpRoot -Recurse -Force
+            Remove-Item `
+              -Path $tmpRoot `
+              -Recurse `
+              -Force
           }
 
           if (Test-Path $zip) {
-            Remove-Item $zip -Force
+            Remove-Item `
+              -Path $zip `
+              -Force
           }
 
           New-Item `
@@ -48,59 +54,77 @@ jobs:
             -Force `
             -Path $tmpRoot | Out-Null
 
+          # SourceForge supports use_mirror=autoselect.
+          # Try the downloads endpoint first, then the normal
+          # SourceForge download endpoint.
           $urls = @(
-            "https://github.com/DavidNash2024/Win32xx/archive/refs/tags/v7.5.1.zip",
-            "https://github.com/DavidNash2024/Win32xx/archive/refs/tags/7.5.1.zip",
-            "https://downloads.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.5.1/Win32xx%20751.zip",
-            "https://sourceforge.net/projects/win32-framework/files/Win32%2B%2B/Version%207.5.1/Win32xx%20751.zip/download"
+            "https://downloads.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?use_mirror=autoselect",
+            "https://sourceforge.net/projects/win32-framework/files/Win32%2B%2B/Version%207.6.1/Win32xx761.zip/download?use_mirror=autoselect",
+            "https://downloads.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1"
           )
 
           $downloaded = $false
 
           foreach ($url in $urls) {
             Write-Host ""
-            Write-Host "Trying:"
+            Write-Host "Trying Win32++ download:"
             Write-Host $url
 
             if (Test-Path $zip) {
-              Remove-Item $zip -Force
+              Remove-Item `
+                -Path $zip `
+                -Force
             }
 
-            try {
-              curl.exe `
-                -L `
-                --fail `
-                --retry 3 `
-                --retry-delay 2 `
-                -A "Mozilla/5.0" `
-                -o $zip `
-                $url
+            curl.exe `
+              -L `
+              --fail `
+              --retry 5 `
+              --retry-delay 3 `
+              --connect-timeout 20 `
+              --max-time 300 `
+              -A "Mozilla/5.0" `
+              -o $zip `
+              $url
 
-              if ($LASTEXITCODE -eq 0 -and (Test-Path $zip)) {
-                Write-Host "Download succeeded."
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $zip)) {
+              $size = (Get-Item $zip).Length
+
+              Write-Host ""
+              Write-Host "Download succeeded."
+              Write-Host "Size: $size bytes"
+
+              # Basic sanity check so a HTML error page is not
+              # mistaken for the ZIP archive.
+              if ($size -gt 500000) {
                 $downloaded = $true
                 break
               }
+
+              Write-Host "Downloaded file is unexpectedly small."
+              Remove-Item `
+                -Path $zip `
+                -Force
             }
-            catch {
+            else {
               Write-Host "Download attempt failed."
             }
           }
 
           if (-not $downloaded) {
-            Write-Error "Could not download Win32++ 7.5.1 from any source."
-            Write-Error "The existing Win32++ headers are retained, but the build is expected to hit the old frame.h C2440."
+            Write-Error "Could not download Win32++ 7.6.1."
             exit 1
           }
 
           Write-Host ""
-          Write-Host "Extracting Win32++ 7.5.1..."
+          Write-Host "Extracting Win32++ 7.6.1..."
 
           Expand-Archive `
             -Path $zip `
             -DestinationPath $tmpRoot `
             -Force
 
+          # Locate the actual old-style Win32++ include folder.
           $wincore = Get-ChildItem `
             -Path $tmpRoot `
             -Recurse `
@@ -109,7 +133,7 @@ jobs:
             Select-Object -First 1
 
           if (-not $wincore) {
-            Write-Error "Win32++ 7.5.1 archive does not contain wincore.h."
+            Write-Error "Win32++ 7.6.1 archive does not contain wincore.h."
             exit 1
           }
 
@@ -141,7 +165,8 @@ jobs:
             $path = Join-Path $sourceInclude $header
 
             if (Test-Path $path) {
-              Write-Host "OK    $header"
+              $size = (Get-Item $path).Length
+              Write-Host "OK    $header ($size bytes)"
             }
             else {
               Write-Host "MISS  $header"
@@ -150,11 +175,13 @@ jobs:
           }
 
           if ($missing.Count -gt 0) {
-            Write-Error "Win32++ 7.5.1 is missing required legacy headers:"
+            Write-Error "Win32++ 7.6.1 is missing required legacy headers:"
             Write-Error ($missing -join ", ")
             exit 1
           }
 
+          # Replace the repository's Win32++ 7.0.2 headers
+          # in the CI workspace only.
           if (Test-Path $target) {
             Remove-Item `
               -Path $target `
@@ -174,7 +201,7 @@ jobs:
             -Force
 
           Write-Host ""
-          Write-Host "Win32++ 7.5.1 installed into CI workspace:"
+          Write-Host "Win32++ 7.6.1 installed into CI workspace:"
           Write-Host $target
 
           Get-Item (Join-Path $target "wincore.h") |
@@ -182,7 +209,7 @@ jobs:
 
 
       # ==========================================================
-      # 3. Verify Win32++ 7.5.1
+      # 3. Verify Win32++
       # ==========================================================
       - name: Verify Win32++
         shell: pwsh
@@ -235,7 +262,9 @@ jobs:
             exit 1
           }
 
-          if (Test-Path (Join-Path $win32xx "splitter.h")) {
+          $splitter = Join-Path $win32xx "splitter.h"
+
+          if (Test-Path $splitter) {
             Write-Host "OK    splitter.h"
             "SPLITTER_PRESENT=true" >> $env:GITHUB_ENV
           }
@@ -302,7 +331,9 @@ jobs:
             exit 1
           }
 
-          $content = Get-Content $stdafx -Raw
+          $content = Get-Content `
+            $stdafx `
+            -Raw
 
           $pattern = '(?m)^\s*#include\s*[<"]splitter\.h[>"]\s*\r?\n?'
 
@@ -345,6 +376,11 @@ jobs:
 
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Boost download failed."
+            exit 1
+          }
+
+          if (-not (Test-Path $zip)) {
+            Write-Error "Boost archive was not downloaded."
             exit 1
           }
 
@@ -394,12 +430,14 @@ jobs:
           $finalHeader = "$boostRoot\boost\format.hpp"
 
           if (-not (Test-Path $finalHeader)) {
-            Write-Error "Boost installation failed."
+            Write-Error "Boost installation failed:"
+            Write-Error $finalHeader
             exit 1
           }
 
           Write-Host ""
           Write-Host "Boost 1.82.0 installed successfully:"
+
           Get-Item $finalHeader |
             Format-List FullName,Length
 
@@ -490,8 +528,13 @@ jobs:
             $env:VCPKG_ROOT `
             "installed\x64-windows-static"
 
-          $libRoot = Join-Path $tripletRoot "lib"
-          $includeRoot = Join-Path $tripletRoot "include"
+          $libRoot = Join-Path `
+            $tripletRoot `
+            "lib"
+
+          $includeRoot = Join-Path `
+            $tripletRoot `
+            "include"
 
           if (-not (Test-Path $libRoot)) {
             Write-Error "vcpkg static library directory not found:"
@@ -520,7 +563,7 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Copy complete vcpkg include tree
+          # Copy vcpkg include tree
           # ------------------------------------------------------
           Write-Host ""
           Write-Host "Copying vcpkg headers..."
@@ -533,18 +576,19 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Legacy iNFekt expects:
+          # Legacy iNFekt uses:
           #
           #   #include <cairo-win32.h>
           #
-          # but vcpkg keeps Cairo headers under:
+          # vcpkg places Cairo headers in:
           #
           #   include\cairo\cairo-win32.h
           #
-          # Flatten Cairo headers into dependencies\include.
-          # Keep the original cairo\ subdirectory too.
+          # Flatten the Cairo headers for the legacy source.
           # ------------------------------------------------------
-          $cairoHeaderRoot = Join-Path $includeRoot "cairo"
+          $cairoHeaderRoot = Join-Path `
+            $includeRoot `
+            "cairo"
 
           if (-not (Test-Path $cairoHeaderRoot)) {
             Write-Error "vcpkg Cairo header directory not found:"
@@ -553,7 +597,7 @@ jobs:
           }
 
           Write-Host ""
-          Write-Host "Flattening Cairo headers for legacy iNFekt includes..."
+          Write-Host "Flattening Cairo headers..."
 
           $cairoHeaders = Get-ChildItem `
             -Path $cairoHeaderRoot `
@@ -579,12 +623,11 @@ jobs:
             exit 1
           }
 
-          Write-Host ""
           Write-Host "OK    cairo-win32.h"
 
 
           # ------------------------------------------------------
-          # Copy all static libraries
+          # Copy static libraries
           # ------------------------------------------------------
           Write-Host ""
           Write-Host "Copying vcpkg static libraries..."
@@ -610,15 +653,16 @@ jobs:
 
 
           # ------------------------------------------------------
-          # vcpkg zlib is emitted as zs.lib on this runner.
-          # Legacy iNFekt expects zlib.lib.
+          # Normalize zlib filename:
+          # vcpkg -> zs.lib
+          # iNFekt -> zlib.lib
           # ------------------------------------------------------
           $zs = Join-Path $projectLib "zs.lib"
           $zlib = Join-Path $projectLib "zlib.lib"
 
           if ((Test-Path $zs) -and (-not (Test-Path $zlib))) {
             Write-Host ""
-            Write-Host "Renaming vcpkg zlib library:"
+            Write-Host "Renaming:"
             Write-Host "  zs.lib -> zlib.lib"
 
             Rename-Item `
@@ -628,13 +672,18 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Legacy iNFekt expects cairo-static.lib.
-          # vcpkg emits cairo.lib.
+          # Normalize Cairo filename:
+          # vcpkg -> cairo.lib
+          # iNFekt -> cairo-static.lib
           # ------------------------------------------------------
           $cairo = Join-Path $projectLib "cairo.lib"
           $cairoStatic = Join-Path $projectLib "cairo-static.lib"
 
           if ((Test-Path $cairo) -and (-not (Test-Path $cairoStatic))) {
+            Write-Host ""
+            Write-Host "Renaming:"
+            Write-Host "  cairo.lib -> cairo-static.lib"
+
             Rename-Item `
               -Path $cairo `
               -NewName "cairo-static.lib"
@@ -642,7 +691,7 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Required library validation
+          # Validate required libraries
           # ------------------------------------------------------
           $requiredLibs = @(
             "cairo-static.lib",
@@ -678,7 +727,7 @@ jobs:
 
 
       # ==========================================================
-      # 8. Prepare static x64 linker dependencies
+      # 8. Patch Release-Static x64 linker dependencies
       # ==========================================================
       - name: Prepare static x64 link libraries
         shell: pwsh
@@ -833,6 +882,7 @@ jobs:
           if (Test-Path $expected) {
             Write-Host ""
             Write-Host "Build succeeded:"
+
             Get-Item $expected |
               Format-List FullName,Length,LastWriteTime
 
@@ -903,6 +953,7 @@ jobs:
 
           Write-Host ""
           Write-Host "Portable package:"
+
           Get-Item $zip |
             Format-List FullName,Length,LastWriteTime
 
