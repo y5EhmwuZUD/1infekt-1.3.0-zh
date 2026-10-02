@@ -19,22 +19,32 @@ jobs:
       # ==========================================================
       # 2. Install Win32++ 7.6.1
       #
-      # Official SourceForge file:
-      #   Win32xx761.zip
+      # IMPORTANT:
+      # Do NOT use sourceforge.net/downloads.sourceforge.net here.
       #
-      # Do NOT use GitHub tags here.
-      # The DavidNash2024 GitHub repository does not expose
-      # the old 7.x tags used by this legacy project.
+      # GitHub Actions runners are currently receiving HTTP 403
+      # from those SourceForge download entry points.
+      #
+      # Use direct SourceForge mirror hosts instead.
       # ==========================================================
       - name: Install Win32++ 7.6.1
         shell: pwsh
         run: |
-          $target = Join-Path $PWD "dependencies\include\win32xx"
-          $tmpRoot = Join-Path $env:RUNNER_TEMP "win32xx-761"
-          $zip = Join-Path $env:RUNNER_TEMP "Win32xx761.zip"
+          $target = Join-Path `
+            $PWD `
+            "dependencies\include\win32xx"
+
+          $tmpRoot = Join-Path `
+            $env:RUNNER_TEMP `
+            "win32xx-761"
+
+          $zip = Join-Path `
+            $env:RUNNER_TEMP `
+            "Win32xx761.zip"
 
           Write-Host "Preparing Win32++ 7.6.1..."
-          Write-Host "Target: $target"
+          Write-Host "Target:"
+          Write-Host $target
 
           if (Test-Path $tmpRoot) {
             Remove-Item `
@@ -54,21 +64,40 @@ jobs:
             -Force `
             -Path $tmpRoot | Out-Null
 
-          # SourceForge supports use_mirror=autoselect.
-          # Try the downloads endpoint first, then the normal
-          # SourceForge download endpoint.
-          $urls = @(
-            "https://downloads.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?use_mirror=autoselect",
-            "https://sourceforge.net/projects/win32-framework/files/Win32%2B%2B/Version%207.6.1/Win32xx761.zip/download?use_mirror=autoselect",
-            "https://downloads.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1"
+
+          # ------------------------------------------------------
+          # Direct SourceForge mirrors.
+          #
+          # The file is:
+          #
+          #   Win32xx761.zip
+          #
+          # Project:
+          #
+          #   win32-framework
+          #
+          # Version:
+          #
+          #   Version 7.6.1
+          # ------------------------------------------------------
+          $mirrorUrls = @(
+            "https://cfhcable.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1",
+            "https://phoenixnap.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1",
+            "https://versaweb.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1",
+            "https://pilotfiber.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1",
+            "https://netactuate.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1",
+            "https://newcontinuum.dl.sourceforge.net/project/win32-framework/Win32%2B%2B/Version%207.6.1/Win32xx761.zip?viasf=1"
           )
 
           $downloaded = $false
 
-          foreach ($url in $urls) {
+          foreach ($url in $mirrorUrls) {
+
             Write-Host ""
-            Write-Host "Trying Win32++ download:"
+            Write-Host "=================================================="
+            Write-Host "Trying Win32++ mirror:"
             Write-Host $url
+            Write-Host "=================================================="
 
             if (Test-Path $zip) {
               Remove-Item `
@@ -79,43 +108,93 @@ jobs:
             curl.exe `
               -L `
               --fail `
-              --retry 5 `
-              --retry-delay 3 `
+              --retry 3 `
+              --retry-delay 2 `
               --connect-timeout 20 `
               --max-time 300 `
               -A "Mozilla/5.0" `
               -o $zip `
               $url
 
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $zip)) {
-              $size = (Get-Item $zip).Length
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Mirror request failed."
+              continue
+            }
 
-              Write-Host ""
-              Write-Host "Download succeeded."
-              Write-Host "Size: $size bytes"
+            if (-not (Test-Path $zip)) {
+              Write-Host "Mirror returned no file."
+              continue
+            }
 
-              # Basic sanity check so a HTML error page is not
-              # mistaken for the ZIP archive.
-              if ($size -gt 500000) {
-                $downloaded = $true
-                break
+            $size = (Get-Item $zip).Length
+
+            Write-Host "Downloaded size: $size bytes"
+
+            # Win32xx761.zip is ~3.2 MB.
+            # Reject tiny HTML/error responses.
+            if ($size -lt 500000) {
+              Write-Host "Downloaded file is too small; rejecting."
+              Remove-Item `
+                -Path $zip `
+                -Force
+              continue
+            }
+
+
+            # ----------------------------------------------------
+            # Validate that it is actually a ZIP.
+            # ----------------------------------------------------
+            try {
+              Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+              $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+
+              $hasWincore = $false
+
+              foreach ($entry in $archive.Entries) {
+                if ($entry.FullName -match '(^|/)wincore\.h$') {
+                  $hasWincore = $true
+                  break
+                }
               }
 
-              Write-Host "Downloaded file is unexpectedly small."
+              $archive.Dispose()
+
+              if (-not $hasWincore) {
+                Write-Host "ZIP does not contain wincore.h."
+                Remove-Item `
+                  -Path $zip `
+                  -Force
+                continue
+              }
+
+              Write-Host ""
+              Write-Host "Win32++ archive validation succeeded."
+              Write-Host "wincore.h found."
+
+              $downloaded = $true
+              break
+            }
+            catch {
+              Write-Host "Downloaded file is not a valid ZIP:"
+              Write-Host $_
+
               Remove-Item `
                 -Path $zip `
                 -Force
             }
-            else {
-              Write-Host "Download attempt failed."
-            }
           }
 
           if (-not $downloaded) {
-            Write-Error "Could not download Win32++ 7.6.1."
+            Write-Error ""
+            Write-Error "Could not download Win32++ 7.6.1 from any direct mirror."
             exit 1
           }
 
+
+          # ------------------------------------------------------
+          # Extract
+          # ------------------------------------------------------
           Write-Host ""
           Write-Host "Extracting Win32++ 7.6.1..."
 
@@ -124,7 +203,10 @@ jobs:
             -DestinationPath $tmpRoot `
             -Force
 
-          # Locate the actual old-style Win32++ include folder.
+
+          # ------------------------------------------------------
+          # Locate actual Win32++ include directory.
+          # ------------------------------------------------------
           $wincore = Get-ChildItem `
             -Path $tmpRoot `
             -Recurse `
@@ -140,9 +222,13 @@ jobs:
           $sourceInclude = $wincore.Directory.FullName
 
           Write-Host ""
-          Write-Host "Win32++ include directory:"
+          Write-Host "Detected Win32++ include directory:"
           Write-Host $sourceInclude
 
+
+          # ------------------------------------------------------
+          # Verify required legacy headers.
+          # ------------------------------------------------------
           $requiredHeaders = @(
             "wincore.h",
             "dialog.h",
@@ -162,27 +248,40 @@ jobs:
           $missing = @()
 
           foreach ($header in $requiredHeaders) {
-            $path = Join-Path $sourceInclude $header
+
+            $path = Join-Path `
+              $sourceInclude `
+              $header
 
             if (Test-Path $path) {
+
               $size = (Get-Item $path).Length
+
               Write-Host "OK    $header ($size bytes)"
             }
             else {
+
               Write-Host "MISS  $header"
+
               $missing += $header
             }
           }
 
           if ($missing.Count -gt 0) {
-            Write-Error "Win32++ 7.6.1 is missing required legacy headers:"
+
+            Write-Error "Win32++ 7.6.1 is missing required headers:"
             Write-Error ($missing -join ", ")
+
             exit 1
           }
 
-          # Replace the repository's Win32++ 7.0.2 headers
-          # in the CI workspace only.
+
+          # ------------------------------------------------------
+          # Replace repository Win32++ headers in CI workspace.
+          # This does NOT modify the Git repository.
+          # ------------------------------------------------------
           if (Test-Path $target) {
+
             Remove-Item `
               -Path $target `
               -Recurse `
@@ -200,11 +299,12 @@ jobs:
             -Recurse `
             -Force
 
-          Write-Host ""
-          Write-Host "Win32++ 7.6.1 installed into CI workspace:"
-          Write-Host $target
 
-          Get-Item (Join-Path $target "wincore.h") |
+          Write-Host ""
+          Write-Host "Win32++ 7.6.1 installed successfully."
+
+          Get-Item `
+            (Join-Path $target "wincore.h") |
             Format-List FullName,Length,LastWriteTime
 
 
@@ -244,32 +344,47 @@ jobs:
           $missing = @()
 
           foreach ($header in $requiredHeaders) {
-            $path = Join-Path $win32xx $header
+
+            $path = Join-Path `
+              $win32xx `
+              $header
 
             if (Test-Path $path) {
+
               $size = (Get-Item $path).Length
+
               Write-Host "OK    $header ($size bytes)"
             }
             else {
+
               Write-Host "MISS  $header"
+
               $missing += $header
             }
           }
 
           if ($missing.Count -gt 0) {
+
             Write-Error "Missing Win32++ headers:"
             Write-Error ($missing -join ", ")
+
             exit 1
           }
 
-          $splitter = Join-Path $win32xx "splitter.h"
+          $splitter = Join-Path `
+            $win32xx `
+            "splitter.h"
 
           if (Test-Path $splitter) {
+
             Write-Host "OK    splitter.h"
+
             "SPLITTER_PRESENT=true" >> $env:GITHUB_ENV
           }
           else {
+
             Write-Host "INFO  splitter.h is not present"
+
             "SPLITTER_PRESENT=false" >> $env:GITHUB_ENV
           }
 
@@ -284,14 +399,18 @@ jobs:
         shell: pwsh
         run: |
           if ($env:SPLITTER_PRESENT -eq "true") {
+
             Write-Host "splitter.h exists. No patch required."
+
             exit 0
           }
 
           Write-Host "splitter.h is missing."
           Write-Host "Checking whether CSplitter is actually used..."
 
-          $sourceRoot = Join-Path $PWD "src"
+          $sourceRoot = Join-Path `
+            $PWD `
+            "src"
 
           $splitterUsage = Get-ChildItem `
             -Path $sourceRoot `
@@ -313,6 +432,7 @@ jobs:
           )
 
           if ($actualUsage.Count -gt 0) {
+
             Write-Host ""
             Write-Host "CSplitter usage found:"
 
@@ -321,13 +441,16 @@ jobs:
             }
 
             Write-Error "splitter.h is actually required by the source."
+
             exit 1
           }
 
           $stdafx = "src\win32\stdafx.h"
 
           if (-not (Test-Path $stdafx)) {
+
             Write-Error "stdafx.h not found."
+
             exit 1
           }
 
@@ -375,12 +498,16 @@ jobs:
             $url
 
           if ($LASTEXITCODE -ne 0) {
+
             Write-Error "Boost download failed."
+
             exit 1
           }
 
           if (-not (Test-Path $zip)) {
+
             Write-Error "Boost archive was not downloaded."
+
             exit 1
           }
 
@@ -390,6 +517,7 @@ jobs:
             -Path $installRoot | Out-Null
 
           if (Test-Path $boostRoot) {
+
             Remove-Item `
               -Path $boostRoot `
               -Recurse `
@@ -414,11 +542,14 @@ jobs:
             Select-Object -First 1
 
           if (-not $boostHeader) {
+
             Write-Error "Could not locate Boost after extraction."
+
             exit 1
           }
 
-          $extractedBoostRoot = $boostHeader.Directory.Parent.FullName
+          $extractedBoostRoot = `
+            $boostHeader.Directory.Parent.FullName
 
           Write-Host "Detected Boost root:"
           Write-Host $extractedBoostRoot
@@ -427,11 +558,14 @@ jobs:
             -Path $extractedBoostRoot `
             -NewName "boost"
 
-          $finalHeader = "$boostRoot\boost\format.hpp"
+          $finalHeader = `
+            "$boostRoot\boost\format.hpp"
 
           if (-not (Test-Path $finalHeader)) {
+
             Write-Error "Boost installation failed:"
             Write-Error $finalHeader
+
             exit 1
           }
 
@@ -460,11 +594,13 @@ jobs:
             Select-Object -First 1
 
           if (-not $vcpkgExe) {
+
             Write-Host "vcpkg not found on runner. Cloning..."
 
             $vcpkgRoot = "C:\vcpkg"
 
             if (Test-Path $vcpkgRoot) {
+
               Remove-Item `
                 -Path $vcpkgRoot `
                 -Recurse `
@@ -477,7 +613,9 @@ jobs:
               $vcpkgRoot
 
             if ($LASTEXITCODE -ne 0) {
+
               Write-Error "Failed to clone vcpkg."
+
               exit 1
             }
 
@@ -485,7 +623,9 @@ jobs:
               -disableMetrics
 
             if ($LASTEXITCODE -ne 0) {
+
               Write-Error "Failed to bootstrap vcpkg."
+
               exit 1
             }
 
@@ -520,7 +660,9 @@ jobs:
             --disable-metrics
 
           if ($LASTEXITCODE -ne 0) {
+
             Write-Error "vcpkg Cairo installation failed."
+
             exit 1
           }
 
@@ -537,19 +679,26 @@ jobs:
             "include"
 
           if (-not (Test-Path $libRoot)) {
+
             Write-Error "vcpkg static library directory not found:"
             Write-Error $libRoot
+
             exit 1
           }
 
           if (-not (Test-Path $includeRoot)) {
+
             Write-Error "vcpkg include directory not found:"
             Write-Error $includeRoot
+
             exit 1
           }
 
-          $projectInclude = "dependencies\include"
-          $projectLib = "dependencies\lib_x64_static"
+          $projectInclude = `
+            "dependencies\include"
+
+          $projectLib = `
+            "dependencies\lib_x64_static"
 
           New-Item `
             -ItemType Directory `
@@ -576,23 +725,22 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Legacy iNFekt uses:
+          # Legacy iNFekt expects:
           #
           #   #include <cairo-win32.h>
           #
-          # vcpkg places Cairo headers in:
+          # vcpkg uses:
           #
           #   include\cairo\cairo-win32.h
-          #
-          # Flatten the Cairo headers for the legacy source.
           # ------------------------------------------------------
-          $cairoHeaderRoot = Join-Path `
-            $includeRoot `
-            "cairo"
+          $cairoHeaderRoot = `
+            Join-Path $includeRoot "cairo"
 
           if (-not (Test-Path $cairoHeaderRoot)) {
+
             Write-Error "vcpkg Cairo header directory not found:"
             Write-Error $cairoHeaderRoot
+
             exit 1
           }
 
@@ -605,6 +753,7 @@ jobs:
             -File
 
           foreach ($header in $cairoHeaders) {
+
             Copy-Item `
               -Path $header.FullName `
               -Destination $projectInclude `
@@ -613,13 +762,16 @@ jobs:
             Write-Host "Copied Cairo header $($header.Name)"
           }
 
-          $legacyCairoHeader = Join-Path `
-            $projectInclude `
-            "cairo-win32.h"
+          $legacyCairoHeader = `
+            Join-Path `
+              $projectInclude `
+              "cairo-win32.h"
 
           if (-not (Test-Path $legacyCairoHeader)) {
+
             Write-Error "Legacy Cairo header was not created:"
             Write-Error $legacyCairoHeader
+
             exit 1
           }
 
@@ -638,11 +790,14 @@ jobs:
             -File
 
           if ($libs.Count -eq 0) {
+
             Write-Error "No static libraries were produced by vcpkg."
+
             exit 1
           }
 
           foreach ($lib in $libs) {
+
             Copy-Item `
               -Path $lib.FullName `
               -Destination $projectLib `
@@ -653,17 +808,22 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Normalize zlib filename:
-          # vcpkg -> zs.lib
-          # iNFekt -> zlib.lib
+          # Normalize zlib:
+          #
+          #   zs.lib -> zlib.lib
           # ------------------------------------------------------
-          $zs = Join-Path $projectLib "zs.lib"
-          $zlib = Join-Path $projectLib "zlib.lib"
+          $zs = Join-Path `
+            $projectLib `
+            "zs.lib"
 
-          if ((Test-Path $zs) -and (-not (Test-Path $zlib))) {
-            Write-Host ""
-            Write-Host "Renaming:"
-            Write-Host "  zs.lib -> zlib.lib"
+          $zlib = Join-Path `
+            $projectLib `
+            "zlib.lib"
+
+          if (
+            (Test-Path $zs) -and
+            (-not (Test-Path $zlib))
+          ) {
 
             Rename-Item `
               -Path $zs `
@@ -672,17 +832,22 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Normalize Cairo filename:
-          # vcpkg -> cairo.lib
-          # iNFekt -> cairo-static.lib
+          # Normalize Cairo:
+          #
+          #   cairo.lib -> cairo-static.lib
           # ------------------------------------------------------
-          $cairo = Join-Path $projectLib "cairo.lib"
-          $cairoStatic = Join-Path $projectLib "cairo-static.lib"
+          $cairo = Join-Path `
+            $projectLib `
+            "cairo.lib"
 
-          if ((Test-Path $cairo) -and (-not (Test-Path $cairoStatic))) {
-            Write-Host ""
-            Write-Host "Renaming:"
-            Write-Host "  cairo.lib -> cairo-static.lib"
+          $cairoStatic = Join-Path `
+            $projectLib `
+            "cairo-static.lib"
+
+          if (
+            (Test-Path $cairo) -and
+            (-not (Test-Path $cairoStatic))
+          ) {
 
             Rename-Item `
               -Path $cairo `
@@ -691,7 +856,7 @@ jobs:
 
 
           # ------------------------------------------------------
-          # Validate required libraries
+          # Required library validation
           # ------------------------------------------------------
           $requiredLibs = @(
             "cairo-static.lib",
@@ -703,20 +868,28 @@ jobs:
           $missing = @()
 
           foreach ($lib in $requiredLibs) {
-            $path = Join-Path $projectLib $lib
+
+            $path = Join-Path `
+              $projectLib `
+              $lib
 
             if (Test-Path $path) {
+
               Write-Host "OK    $lib"
             }
             else {
+
               Write-Host "MISS  $lib"
+
               $missing += $lib
             }
           }
 
           if ($missing.Count -gt 0) {
+
             Write-Error "Required static libraries are missing:"
             Write-Error ($missing -join ", ")
+
             exit 1
           }
 
@@ -727,23 +900,30 @@ jobs:
 
 
       # ==========================================================
-      # 8. Patch Release-Static x64 linker dependencies
+      # 8. Prepare static x64 linker dependencies
       # ==========================================================
       - name: Prepare static x64 link libraries
         shell: pwsh
         run: |
-          $projectFile = "project\infekt-win32\iNFekt.vcxproj"
-          $projectLib = "dependencies\lib_x64_static"
+          $projectFile = `
+            "project\infekt-win32\iNFekt.vcxproj"
+
+          $projectLib = `
+            "dependencies\lib_x64_static"
 
           if (-not (Test-Path $projectFile)) {
+
             Write-Error "Project file not found:"
             Write-Error $projectFile
+
             exit 1
           }
 
           if (-not (Test-Path $projectLib)) {
+
             Write-Error "Static library directory not found:"
             Write-Error $projectLib
+
             exit 1
           }
 
@@ -757,7 +937,9 @@ jobs:
             }
 
           if ($libs.Count -eq 0) {
+
             Write-Error "No .lib files found."
+
             exit 1
           }
 
@@ -795,9 +977,11 @@ jobs:
             -Path $projectFile `
             -Raw
 
-          $old = 'comctl32.lib;cairo-static.lib;zlib.lib;shlwapi.lib;uxtheme.lib;winhttp.lib;libpng16.lib;%(AdditionalDependencies)'
+          $old = `
+            'comctl32.lib;cairo-static.lib;zlib.lib;shlwapi.lib;uxtheme.lib;winhttp.lib;libpng16.lib;%(AdditionalDependencies)'
 
           if ($xml.Contains($old)) {
+
             Write-Host "Replacing original Release-Static dependency list."
 
             $xml = $xml.Replace(
@@ -806,13 +990,17 @@ jobs:
             )
           }
           else {
-            Write-Host "Original dependency list not found."
-            Write-Host "Searching Release-Static x64 AdditionalDependencies..."
 
-            $regex = '(?s)(Release-Static\|x64.*?<AdditionalDependencies>).*?(</AdditionalDependencies>)'
+            Write-Host "Original dependency list not found."
+
+            $regex = `
+              '(?s)(Release-Static\|x64.*?<AdditionalDependencies>).*?(</AdditionalDependencies>)'
 
             if ($xml -notmatch $regex) {
-              Write-Error "Could not locate Release-Static|x64 AdditionalDependencies."
+
+              Write-Error `
+                "Could not locate Release-Static|x64 AdditionalDependencies."
+
               exit 1
             }
 
@@ -866,7 +1054,9 @@ jobs:
             /p:PlatformToolset=v143
 
           if ($LASTEXITCODE -ne 0) {
+
             Write-Error "MSBuild failed."
+
             exit 1
           }
 
@@ -877,9 +1067,11 @@ jobs:
       - name: Verify executable
         shell: pwsh
         run: |
-          $expected = "project\build-out\Release-Static-x64\infekt-win64.exe"
+          $expected = `
+            "project\build-out\Release-Static-x64\infekt-win64.exe"
 
           if (Test-Path $expected) {
+
             Write-Host ""
             Write-Host "Build succeeded:"
 
@@ -902,11 +1094,14 @@ jobs:
             -Filter "infekt-win64.exe"
 
           if ($found.Count -eq 0) {
+
             Write-Error "infekt-win64.exe was not produced."
+
             exit 1
           }
 
           $found | ForEach-Object {
+
             Write-Host "Found:"
             Write-Host $_.FullName
           }
@@ -918,7 +1113,9 @@ jobs:
       - name: Package portable build
         shell: pwsh
         run: |
-          $exe = "project\build-out\Release-Static-x64\infekt-win64.exe"
+          $exe = `
+            "project\build-out\Release-Static-x64\infekt-win64.exe"
+
           $outDir = "dist"
           $zip = "dist\iNFekt-win64-portable.zip"
 
@@ -928,6 +1125,7 @@ jobs:
             -Path $outDir | Out-Null
 
           if (-not (Test-Path $exe)) {
+
             $exe = Get-ChildItem `
               -Path "project" `
               -Recurse `
@@ -938,8 +1136,14 @@ jobs:
                 -ExpandProperty FullName
           }
 
-          if (-not $exe -or -not (Test-Path $exe)) {
-            Write-Error "Could not locate infekt-win64.exe for packaging."
+          if (
+            (-not $exe) -or
+            (-not (Test-Path $exe))
+          ) {
+
+            Write-Error `
+              "Could not locate infekt-win64.exe for packaging."
+
             exit 1
           }
 
