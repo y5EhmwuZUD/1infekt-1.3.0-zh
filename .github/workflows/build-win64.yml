@@ -3,23 +3,20 @@ name: Build iNFekt Win64 Portable
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: windows-2022
 
     steps:
-      # ============================================================
-      # Checkout source
-      # ============================================================
-      - name: Checkout iNFekt
+      # ==========================================================
+      # 1. Checkout
+      # ==========================================================
+      - name: Checkout
         uses: actions/checkout@v5
 
-      # ============================================================
-      # Verify Win32++
-      # ============================================================
+      # ==========================================================
+      # 2. Verify Win32++ 7.x headers
+      # ==========================================================
       - name: Verify Win32++
         shell: pwsh
         run: |
@@ -85,9 +82,9 @@ jobs:
           Write-Host ""
           Write-Host "Win32++ verification successful."
 
-      # ============================================================
-      # Handle missing splitter.h
-      # ============================================================
+      # ==========================================================
+      # 3. Remove unused splitter.h include from CI workspace
+      # ==========================================================
       - name: Handle missing splitter.h
         shell: pwsh
         run: |
@@ -123,6 +120,7 @@ jobs:
           if ($actualUsage.Count -gt 0) {
             Write-Host ""
             Write-Host "CSplitter usage found:"
+
             $actualUsage | ForEach-Object {
               Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())"
             }
@@ -155,14 +153,15 @@ jobs:
 
           Write-Host "Unused splitter.h include removed from CI workspace."
 
-      # ============================================================
-      # Install Boost 1.82.0
-      # ============================================================
+      # ==========================================================
+      # 4. Install Boost 1.82.0
+      # ==========================================================
       - name: Install Boost 1.82.0
         shell: pwsh
         run: |
           $url = "https://archives.boost.io/release/1.82.0/source/boost_1_82_0.zip"
           $zip = "$env:RUNNER_TEMP\boost_1_82_0.zip"
+
           $installRoot = "C:\Dev"
           $boostRoot = "C:\Dev\boost"
 
@@ -243,11 +242,9 @@ jobs:
           Get-Item $finalHeader |
             Format-List FullName,Length
 
-      # ============================================================
-      # Setup vcpkg
-      #
-      # We use the current vcpkg static Windows triplet.
-      # ============================================================
+      # ==========================================================
+      # 5. Install / locate vcpkg
+      # ==========================================================
       - name: Setup vcpkg
         shell: pwsh
         run: |
@@ -307,19 +304,10 @@ jobs:
 
           & $vcpkgExe version
 
-      # ============================================================
-      # Build static Cairo + dependencies
-      #
-      # Cairo is installed with [core] so vcpkg does NOT enable its
-      # default fontconfig/freetype features.
-      #
-      # This still brings the static dependencies required by Cairo:
-      #   libpng
-      #   pixman
-      #   zlib
-      #   and the small Windows support libraries used by the port.
-      # ============================================================
-      - name: Build static Cairo dependencies
+      # ==========================================================
+      # 6. Build Cairo + static dependencies
+      # ==========================================================
+      - name: Build Cairo static dependencies
         shell: pwsh
         run: |
           Write-Host ""
@@ -354,32 +342,36 @@ jobs:
             exit 1
           }
 
-          # ----------------------------------------------------------
-          # Copy all generated headers into the project's dependency
-          # include directory.
-          # ----------------------------------------------------------
           $projectInclude = "dependencies\include"
+          $projectLib = "dependencies\lib_x64_static"
 
           New-Item `
             -ItemType Directory `
             -Force `
             -Path $projectInclude | Out-Null
 
-          Copy-Item `
-            "$includeRoot\*" `
-            $projectInclude `
-            -Recurse `
-            -Force
-
-          # ----------------------------------------------------------
-          # Copy all release static libraries.
-          # ----------------------------------------------------------
-          $projectLib = "dependencies\lib_x64_static"
-
           New-Item `
             -ItemType Directory `
             -Force `
             -Path $projectLib | Out-Null
+
+          # ------------------------------------------------------
+          # Copy all headers
+          # ------------------------------------------------------
+          Write-Host ""
+          Write-Host "Copying vcpkg headers..."
+
+          Copy-Item `
+            -Path "$includeRoot\*" `
+            -Destination $projectInclude `
+            -Recurse `
+            -Force
+
+          # ------------------------------------------------------
+          # Copy all release static libraries
+          # ------------------------------------------------------
+          Write-Host ""
+          Write-Host "Copying vcpkg static libraries..."
 
           $libs = Get-ChildItem `
             -Path $libRoot `
@@ -400,35 +392,53 @@ jobs:
             Write-Host "Copied $($lib.Name)"
           }
 
-          # ----------------------------------------------------------
-          # The iNFekt VCXPROJ expects cairo-static.lib.
+          # ------------------------------------------------------
+          # vcpkg currently emits zlib as zs.lib.
           #
-          # vcpkg's static Cairo library is named cairo.lib.
-          # ----------------------------------------------------------
+          # The old iNFekt project expects zlib.lib.
+          # Normalize the filename for the legacy VCXPROJ.
+          # ------------------------------------------------------
+          $zs = Join-Path $projectLib "zs.lib"
+          $zlib = Join-Path $projectLib "zlib.lib"
+
+          if ((Test-Path $zs) -and (-not (Test-Path $zlib))) {
+            Write-Host ""
+            Write-Host "Renaming vcpkg zlib library:"
+            Write-Host "  zs.lib -> zlib.lib"
+
+            Rename-Item `
+              -Path $zs `
+              -NewName "zlib.lib"
+          }
+
+          # ------------------------------------------------------
+          # The iNFekt VCXPROJ expects cairo-static.lib.
+          # vcpkg produces cairo.lib.
+          # ------------------------------------------------------
           $cairo = Join-Path $projectLib "cairo.lib"
           $cairoStatic = Join-Path $projectLib "cairo-static.lib"
 
-          if (-not (Test-Path $cairo)) {
-            Write-Error "vcpkg did not produce cairo.lib"
-            exit 1
+          if ((Test-Path $cairo) -and (-not (Test-Path $cairoStatic))) {
+            Rename-Item `
+              -Path $cairo `
+              -NewName "cairo-static.lib"
           }
-
-          if (Test-Path $cairoStatic) {
-            Remove-Item $cairoStatic -Force
-          }
-
-          Rename-Item `
-            -Path $cairo `
-            -NewName "cairo-static.lib"
 
           Write-Host ""
-          Write-Host "Static Cairo renamed to:"
-          Write-Host $cairoStatic
+          Write-Host "Static libraries now present:"
+          Get-ChildItem `
+            -Path $projectLib `
+            -Filter "*.lib" `
+            -File |
+            Sort-Object Name |
+            ForEach-Object {
+              Write-Host "  $($_.Name)"
+            }
 
-          # ----------------------------------------------------------
-          # Verify required libraries.
-          # ----------------------------------------------------------
-          $required = @(
+          # ------------------------------------------------------
+          # Verify required legacy names
+          # ------------------------------------------------------
+          $requiredLibs = @(
             "cairo-static.lib",
             "libpng16.lib",
             "zlib.lib",
@@ -437,7 +447,7 @@ jobs:
 
           $missing = @()
 
-          foreach ($lib in $required) {
+          foreach ($lib in $requiredLibs) {
             $path = Join-Path $projectLib $lib
 
             if (Test-Path $path) {
@@ -460,51 +470,46 @@ jobs:
           Write-Host "Cairo static dependency build complete"
           Write-Host "========================================"
 
-      # ============================================================
-      # Patch Release-Static|x64 linker dependencies
-      #
-      # The original project only lists:
-      #   cairo-static.lib
-      #   zlib.lib
-      #   libpng16.lib
-      #
-      # A modern static Cairo archive also has transitive static
-      # dependencies such as pixman. Add every static library
-      # generated in this vcpkg installation to the Release-Static
-      # x64 linker input.
-      #
-      # This changes only the CI workspace, not the repository.
-      # ============================================================
-      - name: Configure static linker dependencies
+      # ==========================================================
+      # 7. Patch Release-Static x64 linker dependencies
+      # ==========================================================
+      - name: Prepare static x64 link libraries
         shell: pwsh
         run: |
           $projectFile = "project\infekt-win32\iNFekt.vcxproj"
-          $libDir = (Resolve-Path "dependencies\lib_x64_static").Path
+          $projectLib = "dependencies\lib_x64_static"
 
           if (-not (Test-Path $projectFile)) {
-            Write-Error "VCXPROJ not found:"
+            Write-Error "Project file not found:"
             Write-Error $projectFile
             exit 1
           }
 
-          $libraryNames = @(
-            Get-ChildItem `
-              -Path $libDir `
-              -Filter "*.lib" `
-              -File |
-            Select-Object -ExpandProperty Name
-          )
-
-          if ($libraryNames.Count -eq 0) {
-            Write-Error "No libraries found in $libDir"
+          if (-not (Test-Path $projectLib)) {
+            Write-Error "Static library directory not found:"
+            Write-Error $projectLib
             exit 1
           }
 
-          $libraryNames = $libraryNames |
-            Sort-Object -Unique
+          $libs = Get-ChildItem `
+            -Path $projectLib `
+            -Filter "*.lib" `
+            -File |
+            Sort-Object Name |
+            ForEach-Object { $_.Name }
 
-          # Windows system libraries needed by Cairo / Win32.
-          $systemLibraries = @(
+          if ($libs.Count -eq 0) {
+            Write-Error "No .lib files found in $projectLib"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Static libraries to link:"
+          $libs | ForEach-Object {
+            Write-Host "  $_"
+          }
+
+          $systemLibs = @(
             "advapi32.lib",
             "comctl32.lib",
             "gdi32.lib",
@@ -521,196 +526,169 @@ jobs:
             "winmm.lib"
           )
 
-          $allDependencies = @(
-            $libraryNames
-            $systemLibraries
-          ) |
-            Sort-Object -Unique
-
-          $dependencyText =
-            ($allDependencies -join ";") +
-            ";%(AdditionalDependencies)"
+          $allLibs = @(
+            $libs
+            $systemLibs
+            "%(AdditionalDependencies)"
+          ) -join ";"
 
           $xml = Get-Content `
             -Path $projectFile `
             -Raw
 
-          $pattern = '(?s)(<ItemDefinitionGroup\s+Condition="' +
-                     "'\`$(Configuration)\|\`$(Platform)'=='Release-Static\|x64'" +
-                     '">.*?<Link>\s*)' +
-                     '<AdditionalDependencies>.*?</AdditionalDependencies>'
+          $old = 'comctl32.lib;cairo-static.lib;zlib.lib;shlwapi.lib;uxtheme.lib;winhttp.lib;libpng16.lib;%(AdditionalDependencies)'
 
-          $replacement =
-            '${1}<AdditionalDependencies>' +
-            $dependencyText +
-            '</AdditionalDependencies>'
+          if (-not $xml.Contains($old)) {
+            Write-Host "Original Release-Static x64 dependency list was not found."
 
-          $updated = [regex]::Replace(
-            $xml,
-            $pattern,
-            $replacement,
-            1
-          )
+            $regex = '(?s)(Release-Static\|x64.*?<AdditionalDependencies>).*?(</AdditionalDependencies>)'
 
-          if ($updated -eq $xml) {
-            Write-Error "Could not locate Release-Static|x64 Link block."
-            exit 1
+            if ($xml -notmatch $regex) {
+              Write-Error "Could not locate Release-Static|x64 AdditionalDependencies."
+              exit 1
+            }
+
+            $xml = [regex]::Replace(
+              $xml,
+              $regex,
+              {
+                param($m)
+                $m.Groups[1].Value + $allLibs + $m.Groups[2].Value
+              },
+              1
+            )
+          }
+          else {
+            Write-Host "Replacing original Release-Static x64 dependency list."
+
+            $xml = $xml.Replace(
+              $old,
+              $allLibs
+            )
           }
 
           Set-Content `
             -Path $projectFile `
-            -Value $updated `
+            -Value $xml `
             -Encoding utf8
 
           Write-Host ""
-          Write-Host "========================================"
-          Write-Host "Static linker dependencies configured"
-          Write-Host "========================================"
+          Write-Host "Temporary CI VCXPROJ patch completed."
 
-          Write-Host ""
-          Write-Host "Libraries passed to linker:"
-          $allDependencies | ForEach-Object {
-            Write-Host "  $_"
-          }
-
-      # ============================================================
-      # Verify generated libraries
-      # ============================================================
-      - name: Verify generated libraries
-        shell: pwsh
-        run: |
-          $libDir = "dependencies\lib_x64_static"
-
-          $required = @(
-            "cairo-static.lib",
-            "libpng16.lib",
-            "zlib.lib",
-            "pixman-1.lib"
-          )
-
-          foreach ($lib in $required) {
-            $path = Join-Path $libDir $lib
-
-            if (-not (Test-Path $path)) {
-              Write-Error "Missing:"
-              Write-Error $path
-              exit 1
-            }
-
-            $size = (Get-Item $path).Length
-            Write-Host "OK    $lib ($size bytes)"
-          }
-
-      # ============================================================
-      # Setup MSBuild
-      # ============================================================
+      # ==========================================================
+      # 8. Setup MSBuild
+      # ==========================================================
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v3
         with:
           msbuild-architecture: x64
 
-      # ============================================================
-      # Build
-      # ============================================================
-      - name: Build iNFekt
+      # ==========================================================
+      # 9. Build Release-Static x64
+      # ==========================================================
+      - name: Build iNFekt Release-Static x64
         shell: pwsh
         run: |
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "Building iNFekt"
-          Write-Host "Configuration : Release-Static"
-          Write-Host "Platform      : x64"
-          Write-Host "Toolset       : v143"
-          Write-Host "========================================"
+          Write-Host "Building iNFekt..."
 
           msbuild `
             project/infekt-win32/iNFekt.vcxproj `
             /m `
             /p:Configuration=Release-Static `
             /p:Platform=x64 `
-            /p:PlatformToolset=v143 `
-            /verbosity:minimal
+            /p:PlatformToolset=v143
 
           if ($LASTEXITCODE -ne 0) {
             Write-Error "MSBuild failed."
             exit 1
           }
 
-      # ============================================================
-      # Verify executable
-      # ============================================================
-      - name: Verify build
+      # ==========================================================
+      # 10. Locate executable
+      # ==========================================================
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          $expected = "project\build-out\Release-Static-x64\infekt-win64.exe"
+
+          if (Test-Path $expected) {
+            Write-Host ""
+            Write-Host "Build succeeded:"
+            Get-Item $expected |
+              Format-List FullName,Length,LastWriteTime
+            exit 0
+          }
+
+          Write-Host "Expected executable not found:"
+          Write-Host $expected
+
+          Write-Host ""
+          Write-Host "Searching project tree..."
+
+          $found = Get-ChildItem `
+            -Path "project" `
+            -Recurse `
+            -File `
+            -Filter "infekt-win64.exe"
+
+          if ($found.Count -eq 0) {
+            Write-Error "infekt-win64.exe was not produced."
+            exit 1
+          }
+
+          $found | ForEach-Object {
+            Write-Host "Found:"
+            Write-Host $_.FullName
+          }
+
+      # ==========================================================
+      # 11. Package portable ZIP
+      # ==========================================================
+      - name: Package portable build
         shell: pwsh
         run: |
           $exe = "project\build-out\Release-Static-x64\infekt-win64.exe"
+          $outDir = "dist"
+          $zip = "dist\iNFekt-win64-portable.zip"
 
-          Write-Host ""
-          Write-Host "Checking:"
-          Write-Host $exe
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $outDir | Out-Null
 
           if (-not (Test-Path $exe)) {
-            Write-Error "infekt-win64.exe was not produced."
+            $exe = Get-ChildItem `
+              -Path "project" `
+              -Recurse `
+              -File `
+              -Filter "infekt-win64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
 
-            Write-Host ""
-            Write-Host "Build output:"
-
-            if (Test-Path "project\build-out") {
-              Get-ChildItem `
-                -Path "project\build-out" `
-                -Recurse `
-                -File |
-                Select-Object FullName,Length
-            }
-
+          if (-not $exe -or -not (Test-Path $exe)) {
+            Write-Error "Could not locate infekt-win64.exe for packaging."
             exit 1
           }
 
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "BUILD SUCCESSFUL"
-          Write-Host "========================================"
-
-          Get-Item $exe |
-            Format-List FullName,Length
-
-      # ============================================================
-      # Package portable ZIP
-      # ============================================================
-      - name: Package portable ZIP
-        shell: pwsh
-        run: |
-          $src = "project\build-out\Release-Static-x64"
-          $zip = "iNFekt-win64-portable.zip"
-
-          if (-not (Test-Path "$src\infekt-win64.exe")) {
-            Write-Error "Executable not found."
-            exit 1
-          }
+          Write-Host "Packaging:"
+          Write-Host $exe
 
           Compress-Archive `
-            -Path "$src\*" `
+            -Path $exe `
             -DestinationPath $zip `
             -Force
 
-          if (-not (Test-Path $zip)) {
-            Write-Error "Failed to create portable ZIP."
-            exit 1
-          }
-
           Write-Host ""
-          Write-Host "========================================"
-          Write-Host "PORTABLE PACKAGE CREATED"
-          Write-Host "========================================"
-
+          Write-Host "Portable package:"
           Get-Item $zip |
-            Format-List FullName,Length
+            Format-List FullName,Length,LastWriteTime
 
-      # ============================================================
-      # Upload artifact
-      # ============================================================
-      - name: Upload portable build
+      # ==========================================================
+      # 12. Upload artifact
+      # ==========================================================
+      - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
         with:
           name: iNFekt-win64-portable
-          path: iNFekt-win64-portable.zip
+          path: dist/iNFekt-win64-portable.zip
           if-no-files-found: error
